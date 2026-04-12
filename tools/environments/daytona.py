@@ -16,6 +16,7 @@ from tools.environments.base import (
     _ThreadedProcessHandle,
 )
 from tools.environments.file_sync import (
+    BulkDownloadFn,
     FileSyncManager,
     iter_sync_files,
     quoted_mkdir_command,
@@ -134,6 +135,7 @@ class DaytonaEnvironment(BaseEnvironment):
             upload_fn=self._daytona_upload,
             delete_fn=self._daytona_delete,
             bulk_upload_fn=self._daytona_bulk_upload,
+            bulk_download_fn=self._daytona_bulk_download,
         )
         self._sync_manager.sync(force=True)
         self.init_session()
@@ -165,6 +167,14 @@ class DaytonaEnvironment(BaseEnvironment):
             for host_path, remote_path in files
         ]
         self._sandbox.fs.upload_files(uploads)
+
+    def _daytona_bulk_download(self, dest: Path) -> None:
+        """Download remote .hermes/ as a tar archive."""
+        base = shlex.quote(self._remote_home)
+        self._sandbox.process.exec(
+            f"tar cf /tmp/.hermes_sync.tar -C {base}/.hermes ."
+        )
+        self._sandbox.fs.download_file("/tmp/.hermes_sync.tar", str(dest))
 
     def _daytona_delete(self, remote_paths: list[str]) -> None:
         """Batch-delete remote files via SDK exec."""
@@ -213,6 +223,10 @@ class DaytonaEnvironment(BaseEnvironment):
         return _ThreadedProcessHandle(exec_fn, cancel_fn=cancel)
 
     def cleanup(self):
+        if self._sync_manager:
+            logger.info("Daytona: syncing files from sandbox...")
+            self._sync_manager.sync_back()
+
         with self._lock:
             if self._sandbox is None:
                 return
