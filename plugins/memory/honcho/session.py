@@ -845,6 +845,30 @@ class HonchoSessionManager:
 
         return []
 
+    @property
+    def _max_conclusions(self) -> int | None:
+        """Max conclusions for peer.context() / session.context() calls.
+
+        Derives from context_tokens config (1000 tokens ≈ 10 conclusions).
+        Override via maxConclusions in honcho.json host block.
+        None means no limit (Honcho server default).
+        """
+        if self._config and hasattr(self._config, 'raw') and self._config.raw:
+            raw = self._config.raw
+            host_block = (raw.get("hosts") or {}).get(
+                self._config.host if hasattr(self._config, 'host') else None, {}
+            )
+            explicit = host_block.get("maxConclusions") or raw.get("maxConclusions")
+            if explicit is not None:
+                try:
+                    return max(1, min(int(explicit), 100))
+                except (ValueError, TypeError):
+                    pass
+        # Derive from context_tokens: ~100 tokens per conclusion is a reasonable estimate
+        if self._context_tokens and self._context_tokens > 0:
+            return max(5, min(self._context_tokens // 100, 20))
+        return None
+
     def _fetch_peer_context(
         self,
         peer_id: str,
@@ -863,6 +887,8 @@ class HonchoSessionManager:
                 context_kwargs["target"] = target
             if search_query is not None:
                 context_kwargs["search_query"] = search_query
+            if self._max_conclusions is not None:
+                context_kwargs["max_conclusions"] = self._max_conclusions
             ctx = peer.context(**context_kwargs) if context_kwargs else peer.context()
             representation = (
                 getattr(ctx, "representation", None)
@@ -909,11 +935,14 @@ class HonchoSessionManager:
 
         try:
             peer_id = self._resolve_peer_id(session, peer)
-            ctx = honcho_session.context(
-                summary=True,
-                peer_target=peer_id,
-                peer_perspective=session.user_peer_id if peer == "user" else session.assistant_peer_id,
-            )
+            session_ctx_kwargs: dict[str, Any] = {
+                "summary": True,
+                "peer_target": peer_id,
+                "peer_perspective": session.user_peer_id if peer == "user" else session.assistant_peer_id,
+            }
+            if self._max_conclusions is not None:
+                session_ctx_kwargs["max_conclusions"] = self._max_conclusions
+            ctx = honcho_session.context(**session_ctx_kwargs)
 
             result: dict[str, Any] = {}
 

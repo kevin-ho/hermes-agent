@@ -1168,6 +1168,8 @@ class HonchoMemoryProvider(MemoryProvider):
                 )
                 if not result:
                     return json.dumps({"result": "No relevant context found."})
+                # Apply contextTokens truncation budget to tool output
+                result = self._truncate_to_budget(result)
                 return json.dumps({"result": result})
 
             elif tool_name == "honcho_reasoning":
@@ -1183,7 +1185,9 @@ class HonchoMemoryProvider(MemoryProvider):
                 )
                 # Update cadence tracker so auto-injection respects the gap after an explicit call
                 self._last_dialectic_turn = self._turn_count
-                return json.dumps({"result": result or "No result from Honcho."})
+                # Apply contextTokens truncation budget to tool output
+                result = self._truncate_to_budget(result or "No result from Honcho.")
+                return json.dumps({"result": result})
 
             elif tool_name == "honcho_context":
                 peer = args.get("peer", "user")
@@ -1204,7 +1208,10 @@ class HonchoMemoryProvider(MemoryProvider):
                         for m in msgs[-5:]  # last 5 for brevity
                     )
                     parts.append(f"## Recent messages\n{msg_str}")
-                return json.dumps({"result": "\n\n".join(parts) or "No context available."})
+                result = "\n\n".join(parts) or "No context available."
+                # Apply contextTokens truncation budget to tool output
+                result = self._truncate_to_budget(result)
+                return json.dumps({"result": result})
 
             elif tool_name == "honcho_conclude":
                 delete_id = (args.get("delete_id") or "").strip()
