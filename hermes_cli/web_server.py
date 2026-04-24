@@ -2405,6 +2405,34 @@ async def pty_ws(ws: WebSocket) -> None:
         bridge.close()
 
 
+# ---------------------------------------------------------------------------
+# /api/ws — JSON-RPC WebSocket sidecar for the dashboard "Chat" tab.
+#
+# Drives the same `tui_gateway.dispatch` surface Ink uses over stdio, so the
+# dashboard can render structured metadata (model badge, tool-call sidebar,
+# slash launcher, session info) alongside the xterm.js terminal that PTY
+# already paints. Both transports bind to the same session id when one is
+# active, so a tool.start emitted by the agent fans out to both sinks.
+# ---------------------------------------------------------------------------
+
+
+@app.websocket("/api/ws")
+async def gateway_ws(ws: WebSocket) -> None:
+    token = ws.query_params.get("token", "")
+    if not hmac.compare_digest(token.encode(), _SESSION_TOKEN.encode()):
+        await ws.close(code=4401)
+        return
+
+    client_host = ws.client.host if ws.client else ""
+    if client_host and client_host not in _LOOPBACK_HOSTS:
+        await ws.close(code=4403)
+        return
+
+    from tui_gateway.ws import handle_ws
+
+    await handle_ws(ws)
+
+
 def mount_spa(application: FastAPI):
     """Mount the built SPA. Falls back to index.html for client-side routing.
 

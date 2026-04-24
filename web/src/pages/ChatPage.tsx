@@ -26,6 +26,8 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Copy } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
 
+import { ChatSidebar } from "@/components/ChatSidebar";
+
 function buildWsUrl(token: string, resume: string | null): string {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const qs = new URLSearchParams({ token });
@@ -385,10 +387,14 @@ export default function ChatPage() {
 
   // Layout:
   //   outer flex column — sits inside the dashboard's content area
+  //   row split — terminal pane (flex-1) + sidebar (fixed width, lg+)
   //   terminal wrapper — rounded, dark, padded — the "terminal window"
   //   floating copy button — bottom-right corner, transparent with a
   //     subtle border; stays out of the way until hovered.  Sends
   //     `/copy\n` to Ink, which emits OSC 52 → our clipboard handler.
+  //   sidebar — ChatSidebar opens its own JSON-RPC sidecar; renders
+  //     model badge, tool-call list, model picker. Best-effort: if the
+  //     sidecar fails to connect the terminal pane keeps working.
   //
   // `normal-case` opts out of the dashboard's global `uppercase` rule on
   // the root `<div>` in App.tsx — terminal output must preserve case.
@@ -399,39 +405,45 @@ export default function ChatPage() {
           {banner}
         </div>
       )}
-      <div
-        className="relative flex-1 overflow-hidden rounded-lg"
-        style={{
-          backgroundColor: TERMINAL_THEME.background,
-          padding: "12px",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
-        }}
-      >
-        <div ref={hostRef} className="h-full w-full" />
-
-        <button
-          type="button"
-          onClick={handleCopyLast}
-          title="Copy last assistant response as raw markdown"
-          aria-label="Copy last assistant response"
-          className={[
-            "absolute bottom-4 right-4 z-10",
-            "flex items-center gap-1.5",
-            "rounded border border-current/30",
-            "bg-black/20 backdrop-blur-sm",
-            "px-2.5 py-1.5 text-xs",
-            "opacity-60 hover:opacity-100 hover:border-current/60",
-            "transition-opacity duration-150",
-            "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-current",
-            "cursor-pointer",
-          ].join(" ")}
-          style={{ color: TERMINAL_THEME.foreground }}
+      <div className="flex min-h-0 flex-1 gap-3">
+        <div
+          className="relative min-w-0 flex-1 overflow-hidden rounded-lg"
+          style={{
+            backgroundColor: TERMINAL_THEME.background,
+            padding: "12px",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+          }}
         >
-          <Copy className="h-3 w-3" />
-          <span className="tracking-wide">
-            {copyState === "copied" ? "copied" : "copy last response"}
-          </span>
-        </button>
+          <div ref={hostRef} className="h-full w-full" />
+
+          <button
+            type="button"
+            onClick={handleCopyLast}
+            title="Copy last assistant response as raw markdown"
+            aria-label="Copy last assistant response"
+            className={[
+              "absolute bottom-4 right-4 z-10",
+              "flex items-center gap-1.5",
+              "rounded border border-current/30",
+              "bg-black/20 backdrop-blur-sm",
+              "px-2.5 py-1.5 text-xs",
+              "opacity-60 hover:opacity-100 hover:border-current/60",
+              "transition-opacity duration-150",
+              "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-current",
+              "cursor-pointer",
+            ].join(" ")}
+            style={{ color: TERMINAL_THEME.foreground }}
+          >
+            <Copy className="h-3 w-3" />
+            <span className="tracking-wide">
+              {copyState === "copied" ? "copied" : "copy last response"}
+            </span>
+          </button>
+        </div>
+
+        <div className="hidden min-h-0 lg:block">
+          <ChatSidebar />
+        </div>
       </div>
     </div>
   );
