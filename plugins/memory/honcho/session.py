@@ -628,7 +628,10 @@ class HonchoSessionManager:
         try:
             honcho_session = self._sessions_cache.get(session.honcho_session_id)
             if honcho_session:
-                ctx = honcho_session.context(summary=True)
+                ctx = honcho_session.context(
+                    summary=True,
+                    max_conclusions=max(5, min(20, (self._context_tokens or 1000) // 100)),
+                )
                 if ctx.summary and getattr(ctx.summary, "content", None):
                     result["summary"] = ctx.summary.content
         except Exception as e:
@@ -865,12 +868,8 @@ class HonchoSessionManager:
             context_kwargs: dict[str, Any] = {}
             if target is not None:
                 context_kwargs["target"] = target
-            if search_query is not None:
-                context_kwargs["search_query"] = search_query
             ctx = peer.context(
                 **context_kwargs,
-                max_conclusions=max(5, min(20, (self._context_tokens or 1000) // 100)),
-            ) if context_kwargs else peer.context(
                 max_conclusions=max(5, min(20, (self._context_tokens or 1000) // 100)),
             )
             representation = (
