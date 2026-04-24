@@ -227,7 +227,11 @@ class HonchoSessionManager:
         # Load existing messages via context() - single call for messages + metadata
         existing_messages = []
         try:
-            ctx = session.context(summary=True, tokens=self._context_tokens)
+            ctx = session.context(
+                summary=True,
+                tokens=self._context_tokens,
+                max_conclusions=max(5, min(20, (self._context_tokens or 1000) // 100)),
+            )
             existing_messages = ctx.messages or []
 
             # Verify chronological ordering
@@ -863,7 +867,12 @@ class HonchoSessionManager:
                 context_kwargs["target"] = target
             if search_query is not None:
                 context_kwargs["search_query"] = search_query
-            ctx = peer.context(**context_kwargs) if context_kwargs else peer.context()
+            ctx = peer.context(
+                **context_kwargs,
+                max_conclusions=max(5, min(20, (self._context_tokens or 1000) // 100)),
+            ) if context_kwargs else peer.context(
+                max_conclusions=max(5, min(20, (self._context_tokens or 1000) // 100)),
+            )
             representation = (
                 getattr(ctx, "representation", None)
                 or getattr(ctx, "peer_representation", None)
@@ -913,6 +922,7 @@ class HonchoSessionManager:
                 summary=True,
                 peer_target=peer_id,
                 peer_perspective=session.user_peer_id if peer == "user" else session.assistant_peer_id,
+                max_conclusions=max(5, min(20, (self._context_tokens or 1000) // 100)),
             )
 
             result: dict[str, Any] = {}
